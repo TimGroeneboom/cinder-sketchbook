@@ -7,11 +7,6 @@
 #include "cinder/Font.h"
 #include "cinder/params/Params.h"
 
-#include "cinder/qtime/QuickTime.h"
-#include "cinder/qtime/MovieWriter.h"
-#include "cinder/Utilities.h"
-//#include "cinder/qtime/QuickTimeUtils.h"
-
 #include "Kinect.h"
 
 using namespace ci;
@@ -38,7 +33,7 @@ protected:
 	void		onVideoSurfaceReady( ci::Surface8u videoSurface, const DeviceOptions& options );
 
 	// surfaces return from kinect and notifiers
-	ci::Surface16u	mDepthSurface;	bool mHasNewDepthSurface;
+	ci::Surface16u	mDepthSurface;	bool	mHasNewDepthSurface;
 	ci::Surface8u	mVideoSurface;	bool mHasNewVideoSurface;
 	ci::Surface32f	mCorrectionMap; bool mRenderedCorrectionMap;
 
@@ -47,15 +42,13 @@ protected:
 	gl::Fbo			mVideoFbo;	
 	gl::Fbo			mSubstractedVideoFbo;
 
-	gl::Fbo			mMovieFbo;
+	gl::Fbo			mStoredDepthFbo;
 	gl::Fbo			mStoredVideoFbo;
 
 	// render call's
 	void			renderDepth();
 	void			renderVideo();
 	void			renderSubstractedVideo();
-	void			renderMovie();
-	void			renderSubstractedVideoAgainstMovie();
 
 	// shaders
 	gl::GlslProg	mSubstractShader;
@@ -71,16 +64,6 @@ protected:
 	//
 	void					clear();
 	void					snapshot();
-
-	//
-	ci::qtime::MovieWriter	mVideoWriter;
-
-	ci::qtime::MovieGl	mVideo;
-
-	bool					mRecording;
-
-	//
-	float					mPrevVideoTime;
 };
 
 void KinectEcard::setup(){
@@ -115,7 +98,7 @@ void KinectEcard::setup(){
 	mVideoFbo				= gl::Fbo( 640, 480, false );
 	mSubstractedVideoFbo	= gl::Fbo( 640, 480, false );
 	mStoredVideoFbo			= gl::Fbo( 640, 480, false );
-	mMovieFbo				= gl::Fbo( 640, 480, false );
+	mStoredDepthFbo			= gl::Fbo( 640, 480, false );
 
 	// init shaders
 	mSubstractShader		= gl::GlslProg( app::loadAsset( "passThru_vert.glsl" ), app::loadAsset( "substract_frag.glsl" ) );
@@ -123,6 +106,10 @@ void KinectEcard::setup(){
 	mDepthCorrectionShader	= gl::GlslProg( app::loadAsset( "passThru_vert.glsl" ), app::loadAsset( "correction_frag.glsl" ) );
 
 	// clear out fbo;s
+	mStoredDepthFbo.bindFramebuffer();
+	gl::clear( Color::white() );
+	mStoredDepthFbo.unbindFramebuffer();
+
 	mStoredVideoFbo.bindFramebuffer();
 	gl::clear( Color::white() );
 	mStoredVideoFbo.unbindFramebuffer();
@@ -144,13 +131,6 @@ void KinectEcard::setup(){
 	mUseDepthCorrection = true;
 	mDrawDepthCorrectionMap = false;
 	mFps = 0;
-
-	//
-	mRecording		= false;
-	mPrevVideoTime	= 0.0f;
-
-	//
-	mVideoWriter	= qtime::MovieWriter( getAssetPath("") / "video0.mov", 1280, 480, qtime::MovieWriter::Format( qtime::MovieWriter::CODEC_RAW, 1.0f ).enableTemporal( false ) );
 }
 
 void KinectEcard::onDepthSurfaceReady( ci::Surface16u depthSurface, const DeviceOptions& options ){
@@ -185,24 +165,6 @@ void KinectEcard::keyDown( KeyEvent event )
 		shutdown();
 	}else if( event.getChar() == KeyEvent::KEY_c ){
 		clear();
-	}else if( event.getChar() == KeyEvent::KEY_r ){
-		if( !mRecording ){
-			mRecording = true;
-		}else{
-			static int count = 0;
-			static int prevCount = 0;
-
-			count++;
-			count%=2;
-			mVideoWriter = qtime::MovieWriter( getAssetPath("") / ( "video" + ci::toString<int>(count) + ".mov" ).c_str(), 640, 480, qtime::MovieWriter::Format( qtime::MovieWriter::CODEC_RAW, 1.0f ).enableTemporal( false ) );
-		
-			mVideo = qtime::MovieGl( loadAsset( "video" + ci::toString<int>(prevCount) + ".mov") );
-			prevCount++;
-			prevCount%=2;
-
-			mVideo.play();
-			mVideo.setLoop();
-		}
 	}
 }
 
@@ -236,34 +198,20 @@ void KinectEcard::update(){
 		if( mHasNewVideoSurface ) mHasNewVideoSurface = false;
 	}
 
-	renderMovie();
-
 	mFps = (int)getAverageFps();
 }
 
-void KinectEcard::renderMovie(){
-	mMovieFbo.bindFramebuffer();
-	gl::pushMatrices();
-	{
-		gl::clear( Color::white() );
-		gl::color( Color::white() );
-		gl::setMatricesWindowPersp( mMovieFbo.getSize() );
-
-		if( mVideo )
-			gl::draw( mVideo.getTexture() );
-	}
-	gl::popMatrices();
-	mMovieFbo.unbindFramebuffer();
-}
-
 void	KinectEcard::clear(){
+	mStoredDepthFbo.bindFramebuffer();
+	gl::clear( Color::white() );
+	mStoredDepthFbo.unbindFramebuffer();
+
 	mStoredVideoFbo.bindFramebuffer();
 	gl::clear( Color::white() );
 	mStoredVideoFbo.unbindFramebuffer();
 }
 
 void	KinectEcard::snapshot(){
-	/*
 	gl::Fbo fbo( 640, 480, false );
 
 	// render stored depth FBO
@@ -304,7 +252,7 @@ void	KinectEcard::snapshot(){
 	fbo.unbindFramebuffer();
 
 	// save it
-	fbo.blitTo( mStoredVideoFbo, fbo.getBounds(), mStoredVideoFbo.getBounds() );*/
+	fbo.blitTo( mStoredVideoFbo, fbo.getBounds(), mStoredVideoFbo.getBounds() );
 }
 
 void KinectEcard::renderDepth(){
@@ -368,6 +316,7 @@ void KinectEcard::renderVideo(){
 		mVideoFbo.unbindFramebuffer();
 	}
 	gl::popMatrices();
+	
 }
 
 void KinectEcard::renderSubstractedVideo(){
@@ -385,24 +334,26 @@ void KinectEcard::renderSubstractedVideo(){
 		mSubstractShader.bind();
 		mSubstractShader.uniform( "tex0", 0 );
 		mSubstractShader.uniform( "tex1", 1 );
+		mSubstractShader.uniform( "tex2", 2 );
+		mSubstractShader.uniform( "tex3", 3 );
 
 		mVideoFbo.bindTexture(0);
 		mDepthFbo.bindTexture(1);
+		mStoredVideoFbo.bindTexture(2);
+		mStoredDepthFbo.bindTexture(3);
 		
 		gl::drawSolidRect( mSubstractedVideoFbo.getBounds() );
 
 		mVideoFbo.unbindTexture();
 		mDepthFbo.unbindTexture();
-		
+		mStoredVideoFbo.unbindTexture();
+		mStoredDepthFbo.unbindTexture();
+
 		mSubstractShader.unbind();
 	}
 	gl::popMatrices();
 
 	mSubstractedVideoFbo.unbindFramebuffer();
-}
-
-void KinectEcard::renderSubstractedVideoAgainstMovie(){
-	m
 }
 
 void KinectEcard::draw()
@@ -433,31 +384,37 @@ void KinectEcard::draw()
 			mDepthFbo.getTexture().setFlipped();
 			gl::draw( mDepthFbo.getTexture() );
 
+				gl::pushMatrices();
+					gl::enableAlphaBlending();
+					gl::drawString( "Depth stream ", Vec2f( 20, 10 ), ColorA::black(), Font( "Arial", 40 )  );
+					gl::disableAlphaBlending();
+				gl::popMatrices();
+			gl::popMatrices();
+		gl::popMatrices();
+		
+		gl::pushMatrices();
+			gl::translate( 0, mVideoFbo.getHeight() );
+			gl::draw( mSubstractedVideoFbo.getTexture() );
+
 			gl::pushMatrices();
 				gl::enableAlphaBlending();
-				gl::drawString( "Depth stream ", Vec2f( 20, 10 ), ColorA::black(), Font( "Arial", 40 )  );
+				gl::drawString( "Result ", Vec2f( 20, 10 ), ColorA::black(), Font( "Arial", 40 )  );
 				gl::disableAlphaBlending();
 			gl::popMatrices();
 		gl::popMatrices();
 
 		gl::pushMatrices();
-			gl::translate( mVideoFbo.getWidth(),  mVideoFbo.getHeight() );
-			gl::draw( mSubstractedVideoFbo.getTexture() );
+			gl::translate( mVideoFbo.getWidth(), mVideoFbo.getHeight() );
+			mStoredDepthFbo.getTexture().setFlipped();
+			gl::draw( mStoredDepthFbo.getTexture() );
 
 			gl::pushMatrices();
 				gl::enableAlphaBlending();
-				//gl::drawString( "Depth stream ", Vec2f( 20, 10 ), ColorA::black(), Font( "Arial", 40 )  );
+				gl::drawString( "Stored depth buffer ", Vec2f( 20, 10 ), ColorA::black(), Font( "Arial", 40 )  );
 				gl::disableAlphaBlending();
 			gl::popMatrices();
 		gl::popMatrices();
-		/*
-		if( mVideo ){
-			gl::pushMatrices();
-				gl::translate( 0, mVideoFbo.getHeight() );
-				gl::draw( mVideo.getTexture() );
-			gl::popMatrices();
-		}*/
-		
+
 		if( mDrawDepthCorrectionMap ){
 			gl::pushMatrices();
 			{
