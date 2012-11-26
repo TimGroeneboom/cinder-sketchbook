@@ -12,12 +12,9 @@
 #include "sweep/cdt.h"
 #include "poly2tri.h"
 
-#include "Kinect.h"
-
 using namespace ci;
 using namespace ci::app;
 using namespace std;
-using namespace KinectSdk;
 
 typedef boost::shared_ptr< p2t::CDT>	CDTRef;
 
