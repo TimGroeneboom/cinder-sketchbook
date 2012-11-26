@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+    <Filter Include="Kinect">
+      <UniqueIdentifier>{6abdc424-49db-4b33-ad23-cfa63771c254}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets">
+      <UniqueIdentifier>{f1beaf42-b88f-436b-ab84-72a84d72205f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OpenCV">
+      <UniqueIdentifier>{3f5b203e-8b53-4cd4-acb9-798a404edacf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{95235bb3-4f84-4967-93fb-511f3f105bd4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\KinectEcard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\blocks\cinder_kinect\src\Kinect.cpp">
+      <Filter>Kinect</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\blocks\cinder_kinect\src\Kinect.h">
+      <Filter>Kinect</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\blocks\opencv\include\CinderOpenCV.h">
+      <Filter>OpenCV</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\assets\passThru_vert.glsl">
+      <Filter>assets</Filter>
+    </None>
+    <None Include="..\assets\substract_frag.glsl">
+      <Filter>assets</Filter>
+    </None>
+    <None Include="..\assets\depthcompare_frag.glsl">
+      <Filter>assets</Filter>
+    </None>
+    <None Include="..\assets\correction_frag.glsl">
+      <Filter>assets</Filter>
+    </None>
+  </ItemGroup>
+</Project>
