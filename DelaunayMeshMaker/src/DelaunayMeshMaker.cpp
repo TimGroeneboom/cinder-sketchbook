@@ -8,6 +8,7 @@
 #include "cinder/gl/GlslProg.h"
 #include "cinder/gl/Fbo.h"
 #include "cinder/Rand.h"
+#include "cinder/ImageIo.h"
 
 #include "sweep/cdt.h"
 #include "poly2tri.h"
@@ -33,6 +34,8 @@ public:
 	void		recalcMesh();
 	
 protected:
+	void		snapshot();
+
 	ci::TriMesh			mMesh;
 	gl::VboMesh			mVboMesh;
 
@@ -54,6 +57,48 @@ protected:
 
 	void				appendVertex( p2t::Point * p, Color & color );
 };
+
+void DelaunayMeshMaker::snapshot(){
+	gl::Fbo::Format fmt;
+	fmt.setCoverageSamples( 16 );
+	fmt.setSamples( 16 );
+
+	gl::Fbo fbo( app::getWindowWidth(), app::getWindowHeight(), fmt );
+
+	fbo.bindFramebuffer();
+
+	gl::clear();
+
+	gl::pushModelView();
+		gl::translate( 0.0f, app::getWindowHeight() );
+		gl::scale( 1, -1 );
+
+		gl::color( ColorA::white() );
+		
+		if( mMesh.getNumTriangles() > 0 ){
+			if( mApplyPhongShading )
+				mPhongShader.bind();
+
+			gl::enableDepthRead();
+			gl::enableDepthWrite();
+			gl::draw( mVboMesh );
+
+			if( mApplyPhongShading )
+				mPhongShader.unbind();
+		}
+
+		gl::color( ColorA( 1, 1, 1, mAlpha ) );
+		gl::disableDepthRead();
+		gl::disableDepthWrite();
+
+		gl::draw( mSurface );
+	gl::popModelView();
+
+	fbo.unbindFramebuffer();
+
+
+	writeImage( writeFile( app::getAssetPath("") / "screenshot.jpg" ), fbo.getTexture(), ImageTarget::Options(), "jpg" ); 
+}
 
 void DelaunayMeshMaker::fileDrop( FileDropEvent event ){
 	try {
@@ -101,11 +146,12 @@ void DelaunayMeshMaker::setup()
 
 	gl::enableAlphaBlending();
 
-	mParams = params::InterfaceGl( "Parameters", Vec2i( 200, 110 ) );
+	mParams = params::InterfaceGl( "Parameters", Vec2i( 250, 200 ) );
 	mParams.addParam( "Alpha", &mAlpha, "max=1.0 min=0.0 step=0.005" );
 	mParams.addParam( "Blend", &mBlend );
 	mParams.addParam( "Phong Shading", &mApplyPhongShading );
 	mParams.addParam( "Depth Offset", &mDepthOffset, "step=0.1" );
+	mParams.addButton( "Take snapshot", std::bind( &DelaunayMeshMaker::snapshot, this ) );
 
 	mAlpha				= 1.0f;
 	mBlend				= false;
