@@ -10,8 +10,11 @@
 #include "cinder/params/Params.h"
 #include "cinder/MayaCamUI.h"
 
+#include "Kinect.h"
+
 using namespace ci;
 using namespace ci::app;
+using namespace KinectSdk;
 
 #include <list>
 using namespace std;
@@ -27,6 +30,10 @@ class DepthVertexDisplacement : public AppBasic {
 	void update();
 protected:
 	void makeMesh();
+	void onDepth( ci::Surface16u surface, const KinectSdk::DeviceOptions &deviceOptions );
+	void onVideo( ci::Surface8u surface, const KinectSdk::DeviceOptions &deviceOptions );
+
+	void renderAlignmentSurface();
 
 	gl::VboMesh		mMesh;
 	gl::GlslProg	mDisplaceShader;
@@ -43,6 +50,14 @@ protected:
 	int					mScreenHeight;
 
 	MayaCamUI			mCam;
+
+	KinectRef			mKinect;
+
+	Surface8u			mVideoSurface;
+	Surface16u			mDepthSurface;
+
+	Surface32f			mAlignmentSurface;
+	bool				mRenderedAlignmentSurface;
 };
 
 void DepthVertexDisplacement::mouseDown( MouseEvent event ){
@@ -58,11 +73,40 @@ void DepthVertexDisplacement::keyDown( KeyEvent event )
 {
 }
 
+void DepthVertexDisplacement::onDepth( ci::Surface16u surface, const KinectSdk::DeviceOptions &deviceOptions )
+{
+	mDepthSurface = surface;
+}
+
+void DepthVertexDisplacement::onVideo( ci::Surface8u surface, const KinectSdk::DeviceOptions &deviceOptions )
+{
+	mVideoSurface = surface;
+}
+
+void DepthVertexDisplacement::renderAlignmentSurface()
+{
+	if( mVideoSurface && mDepthSurface ){
+		for( int x = 0 ; x < mScreenWidth; x++ ){
+			for( int y = 0 ; y < mScreenHeight ; y++ ){
+				Vec2i pos = mKinect->getColorPixelCoordinateFromDepthPixel( Vec2i( x, y ) );
+				mAlignmentSurface.setPixel( Vec2i( x, y ), ColorA( ( ( pos.x )/(float)mScreenWidth), ( ( pos.y ) /(float)mScreenHeight), 0.0f, 0.0f ) );
+			}
+		}
+	}
+}
+
 void DepthVertexDisplacement::update(){
 	if( mMeshStepSize != mPrevMeshStepSize ){
 		mPrevMeshStepSize = mMeshStepSize;
 
 		makeMesh();
+	}
+
+	mKinect->update();
+
+	if( !mRenderedAlignmentSurface ){
+		renderAlignmentSurface();
+		mRenderedAlignmentSurface = true;
 	}
 }
 
@@ -84,14 +128,38 @@ void DepthVertexDisplacement::draw()
 	else
 		gl::disableWireframe();
 
-	mTexture.enableAndBind();
-	mDisplaceShader.bind();
-	mDisplaceShader.uniform( "multiplier", mMultiplier );
-	mDisplaceShader.uniform( "tex", 0 );
+	if( mVideoSurface && mDepthSurface ){
+		gl::Texture depthTexture( mDepthSurface );
+		gl::Texture videoTexture( mVideoSurface );
+		gl::Texture alignmentTexture( mAlignmentSurface );
 
-	gl::draw( mMesh );
+		depthTexture.bind( 0 );
+		videoTexture.bind( 1 );
+		alignmentTexture.bind( 2 );
 
-	mDisplaceShader.unbind();
+		mDisplaceShader.bind();
+		mDisplaceShader.uniform( "multiplier", mMultiplier );
+		mDisplaceShader.uniform( "tex0", 0 );
+		mDisplaceShader.uniform( "tex1", 1 );
+		mDisplaceShader.uniform( "tex2", 2 );
+
+		gl::draw( mMesh );
+
+		mDisplaceShader.unbind();
+
+		gl::pushMatrices();
+
+		gl::setMatricesWindow( Vec2i( mScreenWidth, mScreenHeight ) );
+		gl::scale( 0.25f, 0.25f );
+
+		gl::disableWireframe();
+
+		gl::draw( gl::Texture( mDepthSurface ) );
+		gl::translate( mDepthSurface.getWidth(), 0.0f );
+		gl::draw( gl::Texture( mVideoSurface ) );
+
+		gl::popMatrices();
+	}
 
 	gl::popMatrices();
 
@@ -141,17 +209,31 @@ void DepthVertexDisplacement::setup(){
 	//
 	app::setWindowSize( mScreenWidth, mScreenHeight );
 
+	// setup kinect
+	mKinect = Kinect::create();
+	mKinect->addDepthCallback( &DepthVertexDisplacement::onDepth, this );
+	mKinect->addVideoCallback( &DepthVertexDisplacement::onVideo, this );
+
+	DeviceOptions options;
+	options.setDepthResolution( ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
+	options.setVideoResolution( ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
+	options.enableDepth();
+	options.enableVideo();
+
+	mKinect->start( options );
 	//
 	mMultiplier = 0.0f;
 	mMeshStepSize = 3;
 	mPrevMeshStepSize = mMeshStepSize;
 	mEnableWireFrame = false;
+	mRenderedAlignmentSurface = false;
 
 	//
 	mParams = params::InterfaceGl( "Parameters", Vec2i( 200, 100 ) );
 	mParams.addParam( "Multiplier", &mMultiplier );
 	mParams.addParam( "Mesh density", &mMeshStepSize, "min = 1" );
 	mParams.addParam( "Enable wireframe", &mEnableWireFrame );
+	mParams.addButton( "Render alignment", boost::bind( &DepthVertexDisplacement::renderAlignmentSurface, this ) );
 
 	//
 	app::setFrameRate( 1000.0f );
@@ -180,6 +262,9 @@ void DepthVertexDisplacement::setup(){
 
 	// make maya cam 
 	mCam = MayaCamUI( cameraPerspective );
+
+	// init alignment surface
+	mAlignmentSurface = Surface32f( mScreenWidth, mScreenHeight, false );
 }
 
 // This line tells Flint to actually create the application

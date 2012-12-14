@@ -16,6 +16,9 @@
     <Filter Include="assets">
       <UniqueIdentifier>{12c481b5-2239-4b17-a924-8373ed45f6f6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="kinect">
+      <UniqueIdentifier>{e25d6ece-ef27-49e3-9923-db509f06cc9b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\assets\displace_f.glsl">
@@ -29,5 +32,13 @@
     <ClCompile Include="..\src\DepthVertexDisplacement.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\blocks\kinect\src\Kinect.cpp">
+      <Filter>kinect</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\blocks\kinect\src\Kinect.h">
+      <Filter>kinect</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
