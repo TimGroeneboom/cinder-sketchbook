@@ -15,6 +15,9 @@
     <Filter Include="assets">
       <UniqueIdentifier>{fd7222c7-4b08-42c5-a8aa-e5cb96d35dc4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="opencv">
+      <UniqueIdentifier>{811ab909-7e3b-46b3-8187-78ac076b3927}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\poly2tri\common\shapes.cc">
@@ -60,6 +63,9 @@
     </ClInclude>
     <ClInclude Include="..\poly2tri\poly2tri.h">
       <Filter>poly2tri</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\blocks\Cinder-OpenCV-master\include\CinderOpenCV.h">
+      <Filter>opencv</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

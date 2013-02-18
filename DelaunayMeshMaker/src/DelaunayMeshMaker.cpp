@@ -10,6 +10,8 @@
 #include "cinder/Rand.h"
 #include "cinder/ImageIo.h"
 
+#include "CinderOpenCV.h"
+
 #include "sweep/cdt.h"
 #include "poly2tri.h"
 
@@ -45,17 +47,23 @@ protected:
 	std::vector<float>	mDepthRandom;
 
 	Surface32f			mSurface;
+	Surface8u			mEdgeDetectSurface;
 
 	params::InterfaceGl	mParams;
 	float				mAlpha;
 	float				mDepthOffset; float mPrevDepthOffset;
 	bool				mBlend; bool mPrevBlend;
+	bool				mDrawWireframe;
 	
 	bool				mApplyPhongShading;
 	gl::Fbo				mFbo;
 	gl::GlslProg		mPhongShader;		
 
 	void				appendVertex( p2t::Point * p, Color & color );
+	Surface8u			edgeDetect( Surface8u surface, double minThreshold, double maxThreshold, int scaleDown = 16 );
+	double				mCannyMinThreshold; 
+	double				mCannyMaxThreshold;
+	int					mScaleDown; int mScaleDownPrev;
 };
 
 void DelaunayMeshMaker::snapshot(){
@@ -96,7 +104,6 @@ void DelaunayMeshMaker::snapshot(){
 
 	fbo.unbindFramebuffer();
 
-
 	writeImage( writeFile( app::getAssetPath("") / "screenshot.jpg" ), fbo.getTexture(), ImageTarget::Options(), "jpg" ); 
 }
 
@@ -119,6 +126,7 @@ void DelaunayMeshMaker::fileDrop( FileDropEvent event ){
 		mSteinerPoints.clear();
 		mMesh.clear();
 
+		mEdgeDetectSurface = edgeDetect( Surface8u( mSurface ), mCannyMinThreshold, mCannyMaxThreshold, mScaleDownPrev );
 		recalcMesh();
 	}
 	catch( ... ) {
@@ -151,16 +159,61 @@ void DelaunayMeshMaker::setup()
 	mParams.addParam( "Blend", &mBlend );
 	mParams.addParam( "Phong Shading", &mApplyPhongShading );
 	mParams.addParam( "Depth Offset", &mDepthOffset, "step=0.1" );
+	mParams.addParam( "Draw wireframe", &mDrawWireframe );
 	mParams.addButton( "Take snapshot", std::bind( &DelaunayMeshMaker::snapshot, this ) );
+	
+	mParams.addSeparator();
+	mParams.addText("Edge detection");
+	mParams.addParam( "Edge detection scale down", &mScaleDown, "min=1" );
 
+	mScaleDown = 8;
+	mScaleDownPrev = mScaleDown;
+	mCannyMinThreshold = 60.0;
+	mCannyMaxThreshold = 70.0;
 	mAlpha				= 1.0f;
 	mBlend				= false;
 	mApplyPhongShading	= false;
-	mDepthOffset		= 1.0f;
+	mDrawWireframe		= false;
+	mDepthOffset		= 0.0f;
 	mPrevDepthOffset	= mDepthOffset;
 	mPrevBlend			= mBlend;
 
 	mPhongShader = gl::GlslProg( loadAsset("phong_vert.glsl"), loadAsset("phong_frag.glsl") );
+
+	mEdgeDetectSurface = edgeDetect( Surface8u( mSurface ), mCannyMinThreshold, mCannyMaxThreshold, mScaleDownPrev );
+	recalcMesh();
+}
+
+Surface8u DelaunayMeshMaker::edgeDetect( Surface8u surface, double minThreshold, double maxThreshold, int scaleDown ){
+	// translate from cinder to OCV
+	cv::Mat cvColorImage		= ci::toOcv( surface );
+	cv::Mat cvResizedImage;
+	cv::resize(cvColorImage, cvResizedImage, cv::Size( cvColorImage.cols/scaleDown, cvColorImage.rows/scaleDown ) );
+	
+	// make mat grayscale
+	cv::Mat cvGrayScaleImage;
+	cvtColor( cvResizedImage, cvGrayScaleImage, CV_RGB2GRAY );
+
+	cv::Mat cvOutputImage;
+	try{
+		cv::Canny( cvGrayScaleImage, cvOutputImage, minThreshold, maxThreshold );
+
+		vector<vector<cv::Point> > contours;
+		vector<cv::Vec4i> hierarchy;
+		cv::findContours( cvOutputImage, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE );
+
+		mSteinerPoints.clear();
+		for( auto itr = contours.begin(); itr != contours.end(); ++itr ){
+			for( auto sec_itr = (*itr).begin(); sec_itr != (*itr).end(); ++sec_itr ){
+				mSteinerPoints.push_back( Vec2f( (*sec_itr).x, (*sec_itr).y ) * scaleDown );
+			}
+		}
+	}catch( cv::Exception & e ){
+		app::console() << e.err << std::endl;
+	}
+
+	// translate output image back to cinder
+	return Surface32f( ci::fromOcv( cvOutputImage ) );
 }
 
 void DelaunayMeshMaker::update(){
@@ -185,6 +238,12 @@ void DelaunayMeshMaker::update(){
 
 		mVboMesh = gl::VboMesh( targetMesh );
 		mPrevDepthOffset = mDepthOffset;
+	}
+
+	if( mScaleDown != mScaleDownPrev ){
+		mScaleDownPrev = mScaleDown;
+		mEdgeDetectSurface = edgeDetect( Surface8u( mSurface ), mCannyMinThreshold, mCannyMaxThreshold, mScaleDownPrev );
+		recalcMesh();
 	}
 }
 
@@ -322,7 +381,13 @@ void DelaunayMeshMaker::draw()
 
 			gl::enableDepthRead();
 			gl::enableDepthWrite();
+			if( mDrawWireframe )
+				gl::enableWireframe();
+
 			gl::draw( mVboMesh );
+
+			if( mDrawWireframe )
+				gl::disableWireframe();
 
 			if( mApplyPhongShading )
 				mPhongShader.unbind();
