@@ -241,9 +241,13 @@ void DelaunayMeshMaker::recalcMesh()
 			color2 = mSurface.getPixel( Vec2i( (int)p2->x, (int)p2->y ) );
 			color3 = mSurface.getPixel( Vec2i( (int)p3->x, (int)p3->y ) );
 		}else{
-			color1 = ( mSurface.getPixel( Vec2i( (int)p1->x, (int)p1->y ) ) + mSurface.getPixel( Vec2i( (int)p2->x, (int)p2->y ) ) + mSurface.getPixel( Vec2i( (int)p3->x, (int)p3->y ) ) ) / ( 3.0f );
+			Vec2i center =	( Vec2i( (int)p1->x, (int)p1->y ) / 3.0f ) +
+							( Vec2i( (int)p2->x, (int)p2->y ) / 3.0f ) +
+							( Vec2i( (int)p3->x, (int)p3->y ) / 3.0f );
+
+			color1 = mSurface.getPixel( center );
 			color2 = color1;
-			color3 = color1;
+			color3 = color2;
 		}
 
 		appendVertex( p1, color1 );
