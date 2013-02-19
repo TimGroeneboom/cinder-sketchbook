@@ -115,9 +115,11 @@
     <ClCompile Include="..\poly2tri\sweep\sweep.cc" />
     <ClCompile Include="..\poly2tri\sweep\sweep_context.cc" />
     <ClCompile Include="..\src\DelaunayMeshMaker.cpp" />
+    <ClCompile Include="..\src\Tesselator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\blocks\Cinder-OpenCV-master\include\CinderOpenCV.h" />
+    <ClInclude Include="..\include\Tesselator.h" />
     <ClInclude Include="..\include\Resources.h" />
     <ClInclude Include="..\poly2tri\common\shapes.h" />
     <ClInclude Include="..\poly2tri\common\utils.h" />

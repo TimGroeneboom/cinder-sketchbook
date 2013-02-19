@@ -38,6 +38,9 @@
     <ClCompile Include="..\src\DelaunayMeshMaker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\Tesselator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\Resources.h">
@@ -66,6 +69,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\blocks\Cinder-OpenCV-master\include\CinderOpenCV.h">
       <Filter>opencv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Tesselator.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
